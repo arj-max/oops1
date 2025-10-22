@@ -3,9 +3,9 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class DBConnection {
-    private static final String URL = "jdbc:mysql://localhost:3306/canteen?useSSL=false&serverTimezone=UTC";
+    private static final String URL = "jdbc:mysql://mysql.railway.internal:3306/railway?useSSL=false&serverTimezone=UTC";
     private static final String USER = "root";
-    private static final String PASSWORD = "password"; // change to your DB password
+    private static final String PASSWORD = "ZPBTQIvnrdEfwuFKCbHlyzCHTPsJJmIC"; // change to your DB password
 
     static {
         try {
@@ -29,3 +29,4 @@ public class DBConnection {
         }
     }
 }
+
