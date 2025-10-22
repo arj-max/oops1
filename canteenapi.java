@@ -10,7 +10,7 @@ import java.util.Map;
 
 public class CanteenAPIService {
 
-    private static final int PORT = 8080;
+    private static final int PORT = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
     private static final String WEB_DIR = "./"; // All files in the same folder
 
     public static void main(String[] args) throws IOException {
@@ -172,3 +172,4 @@ public class CanteenAPIService {
     }
 
 }
+
