@@ -1,7 +1,9 @@
-CREATE DATABASE canteen;
+-- Create the database
+CREATE DATABASE IF NOT EXISTS canteen;
 USE canteen;
 
-CREATE TABLE users (
+-- Users table
+CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
@@ -10,7 +12,8 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE menu_items (
+-- Menu items table
+CREATE TABLE IF NOT EXISTS menu_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     description TEXT,
@@ -19,27 +22,30 @@ CREATE TABLE menu_items (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE orders (
+-- Orders table
+CREATE TABLE IF NOT EXISTS orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     time_slot VARCHAR(50) NOT NULL,
     status ENUM('PLACED', 'PAID', 'PREPARING', 'COMPLETED', 'CANCELLED') DEFAULT 'PLACED',
     total_amount DECIMAL(10,2) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE TABLE order_items (
+-- Order items table
+CREATE TABLE IF NOT EXISTS order_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT NOT NULL,
     menu_item_id INT NOT NULL,
     quantity INT NOT NULL,
     price DECIMAL(10,2) NOT NULL,
-    FOREIGN KEY (order_id) REFERENCES orders(id),
-    FOREIGN KEY (menu_item_id) REFERENCES menu_items(id)
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (menu_item_id) REFERENCES menu_items(id) ON DELETE CASCADE
 );
 
-CREATE TABLE payments (
+-- Payments table
+CREATE TABLE IF NOT EXISTS payments (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
@@ -47,16 +53,17 @@ CREATE TABLE payments (
     status VARCHAR(50) NOT NULL,
     transaction_id VARCHAR(100) UNIQUE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (order_id) REFERENCES orders(id)
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 );
 
-CREATE TABLE reviews (
+-- Reviews table
+CREATE TABLE IF NOT EXISTS reviews (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     menu_item_id INT NOT NULL,
     rating INT CHECK (rating >= 1 AND rating <= 5),
     comment TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (menu_item_id) REFERENCES menu_items(id)
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (menu_item_id) REFERENCES menu_items(id) ON DELETE CASCADE
 );
