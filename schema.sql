@@ -1,6 +1,3 @@
--- Create the database
-CREATE DATABASE IF NOT EXISTS canteen;
-USE canteen;
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
@@ -67,3 +64,4 @@ CREATE TABLE IF NOT EXISTS reviews (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (menu_item_id) REFERENCES menu_items(id) ON DELETE CASCADE
 );
+
