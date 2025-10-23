@@ -1,83 +1,67 @@
 import java.sql.*;
 import java.security.MessageDigest;
-import java.util.Optional;
 
 public class User {
 
-    public static class UserModel {
-        public int id;
-        public String name, email;
-        public double wallet;
+    public int id;
+    public String name, email;
+    public double wallet;
 
-        public UserModel(int id, String name, String email, double wallet) {
-            this.id = id;
-            this.name = name;
-            this.email = email;
-            this.wallet = wallet;
-        }
-    }
+    public User() {} // default constructor
 
-    public boolean register(String name, String email, String password) {
-        name = name.trim();
-        email = email.trim().toLowerCase();
-        password = password.trim();
+    private static final double DEFAULT_WALLET = 0.0;
 
-        String sql = "INSERT INTO users (name, email, password) VALUES (?, ?, ?)";
+    public static boolean register(String name, String email, String password) {
+        String sql = "INSERT INTO users (name, email, password, wallet) VALUES (?, ?, ?, ?)";
         try (Connection c = DBConnection.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
 
             if (c == null) return false;
 
-            ps.setString(1, name);
-            ps.setString(2, email);
-            ps.setString(3, sha256(password));
-            System.out.println("Email: " + email + " | Hashed Password: " + sha256(password));
+            ps.setString(1, name.trim());
+            ps.setString(2, email.trim().toLowerCase());
+            ps.setString(3, sha256(password.trim()));
+            ps.setDouble(4, DEFAULT_WALLET);
 
-
-            boolean success = ps.executeUpdate() > 0;
-            if (success) System.out.println("User registered: " + email);
-            return success;
+            int rows = ps.executeUpdate();
+            return rows > 0;
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            // e.g., duplicate email
+            System.err.println("Registration failed: " + e.getMessage());
             return false;
         }
     }
 
-    public Optional<UserModel> login(String email, String password) {
-        email = email.trim().toLowerCase();
-        password = password.trim();
-
+    public static User login(String email, String password) {
         String sql = "SELECT id, name, email, wallet FROM users WHERE email=? AND password=?";
         try (Connection c = DBConnection.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
 
-            if (c == null) return Optional.empty();
+            if (c == null) return null;
 
-            ps.setString(1, email);
-            ps.setString(2, sha256(password));
-            System.out.println("Email: " + email + " | Hashed Password: " + sha256(password));
-
+            ps.setString(1, email.trim().toLowerCase());
+            ps.setString(2, sha256(password.trim()));
 
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return Optional.of(new UserModel(
-                            rs.getInt("id"),
-                            rs.getString("name"),
-                            rs.getString("email"),
-                            rs.getDouble("wallet")
-                    ));
+                    User u = new User();
+                    u.id = rs.getInt("id");
+                    u.name = rs.getString("name");
+                    u.email = rs.getString("email");
+                    u.wallet = rs.getDouble("wallet");
+                    return u;
                 }
-                return Optional.empty();
+                return null;
             }
 
         } catch (SQLException e) {
             e.printStackTrace();
-            return Optional.empty();
+            return null;
         }
     }
 
-    private String sha256(String input) {
+    private static String sha256(String input) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             byte[] b = md.digest(input.getBytes("UTF-8"));
@@ -89,4 +73,3 @@ public class User {
         }
     }
 }
-
