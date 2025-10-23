@@ -31,6 +31,8 @@ public class User {
             ps.setString(1, name);
             ps.setString(2, email);
             ps.setString(3, sha256(password));
+            System.out.println("Email: " + email + " | Hashed Password: " + sha256(password));
+
 
             boolean success = ps.executeUpdate() > 0;
             if (success) System.out.println("User registered: " + email);
@@ -54,6 +56,8 @@ public class User {
 
             ps.setString(1, email);
             ps.setString(2, sha256(password));
+            System.out.println("Email: " + email + " | Hashed Password: " + sha256(password));
+
 
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -85,3 +89,4 @@ public class User {
         }
     }
 }
+
