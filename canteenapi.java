@@ -1,10 +1,13 @@
 import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpExchange;
+import com.google.gson.Gson;
 
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
+import java.security.MessageDigest;
+import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -12,6 +15,7 @@ public class CanteenAPIService {
 
     private static final int PORT = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
     private static final String WEB_DIR = "./"; // All files in the same folder
+    private static final Gson gson = new Gson();
 
     public static void main(String[] args) throws IOException {
         startServer();
@@ -26,21 +30,18 @@ public class CanteenAPIService {
         // API endpoints
         server.createContext("/api/login", new LoginHandler());
         server.createContext("/api/register", new RegisterHandler());
-        // Add other handlers: menu, orders, cart, payment, reviews
 
         server.setExecutor(null);
         server.start();
-        System.out.println("Canteen Management System Server started on port " + PORT);
+        System.out.println("Server started on port " + PORT);
     }
 
-    // Serve static files
+    // ---------------- Static File Handler ----------------
     static class StaticFileHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             String path = exchange.getRequestURI().getPath();
-
             if (path.equals("/")) path = "/index.html";
-
             File file = new File(WEB_DIR + path);
             if (file.exists() && !file.isDirectory()) {
                 String contentType = getContentType(path);
@@ -48,13 +49,11 @@ public class CanteenAPIService {
                 exchange.sendResponseHeaders(200, file.length());
                 Files.copy(file.toPath(), exchange.getResponseBody());
             } else {
-                // fallback to index.html for SPA
                 File indexFile = new File(WEB_DIR + "/index.html");
                 exchange.getResponseHeaders().set("Content-Type", "text/html");
                 exchange.sendResponseHeaders(200, indexFile.length());
                 Files.copy(indexFile.toPath(), exchange.getResponseBody());
             }
-
             exchange.getResponseBody().close();
         }
 
@@ -67,7 +66,41 @@ public class CanteenAPIService {
         }
     }
 
-    // ----------- Login Handler -----------
+    // ---------------- Register Handler ----------------
+    static class RegisterHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (!"POST".equals(exchange.getRequestMethod())) {
+                sendResponse(exchange, "{\"error\":\"Method not allowed\"}", 405);
+                return;
+            }
+            try {
+                String requestBody = readRequestBody(exchange);
+                Map<String, String> params = gson.fromJson(requestBody, Map.class);
+
+                String name = params.get("name").trim();
+                String email = params.get("email").trim().toLowerCase();
+                String password = params.get("password").trim();
+
+                // Hash password
+                String hashedPassword = hashPassword(password);
+
+                boolean success = User.register(name, email, hashedPassword);
+
+                if (success) {
+                    sendResponse(exchange, "{\"success\":true,\"message\":\"Registration successful\"}", 200);
+                } else {
+                    sendResponse(exchange, "{\"success\":false,\"error\":\"Email already exists\"}", 400);
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                sendResponse(exchange, "{\"success\":false,\"error\":\"Server error\"}", 500);
+            }
+        }
+    }
+
+    // ---------------- Login Handler ----------------
     static class LoginHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
@@ -75,23 +108,26 @@ public class CanteenAPIService {
                 sendResponse(exchange, "{\"error\":\"Method not allowed\"}", 405);
                 return;
             }
-
             try {
                 String requestBody = readRequestBody(exchange);
-                Map<String, String> params = parseJson(requestBody);
+                Map<String, String> params = gson.fromJson(requestBody, Map.class);
 
                 String email = params.get("email").trim().toLowerCase();
                 String password = params.get("password").trim();
+                String hashedPassword = hashPassword(password);
 
-                User userService = new User();
-                var result = userService.login(email, password);
+                User user = User.login(email, hashedPassword);
 
-                if (result.isPresent()) {
-                    var user = result.get();
-                    String response = String.format(
-                        "{\"success\":true,\"user\":{\"id\":%d,\"name\":\"%s\",\"email\":\"%s\",\"wallet\":%.2f}}",
-                        user.id, user.name, user.email, user.wallet
-                    );
+                if (user != null) {
+                    String response = gson.toJson(Map.of(
+                            "success", true,
+                            "user", Map.of(
+                                    "id", user.id,
+                                    "name", user.name,
+                                    "email", user.email,
+                                    "wallet", user.wallet
+                            )
+                    ));
                     sendResponse(exchange, response, 200);
                 } else {
                     sendResponse(exchange, "{\"success\":false,\"error\":\"Invalid credentials\"}", 401);
@@ -104,40 +140,7 @@ public class CanteenAPIService {
         }
     }
 
-    // ----------- Register Handler -----------
-    static class RegisterHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            if (!"POST".equals(exchange.getRequestMethod())) {
-                sendResponse(exchange, "{\"error\":\"Method not allowed\"}", 405);
-                return;
-            }
-
-            try {
-                String requestBody = readRequestBody(exchange);
-                Map<String, String> params = parseJson(requestBody);
-
-                String name = params.get("name").trim();
-                String email = params.get("email").trim().toLowerCase();
-                String password = params.get("password").trim();
-
-                User userService = new User();
-                boolean success = userService.register(name, email, password);
-
-                if (success) {
-                    sendResponse(exchange, "{\"success\":true,\"message\":\"Registration successful\"}", 200);
-                } else {
-                    sendResponse(exchange, "{\"success\":false,\"error\":\"Registration failed\"}", 400);
-                }
-
-            } catch (Exception e) {
-                e.printStackTrace();
-                sendResponse(exchange, "{\"success\":false,\"error\":\"Server error\"}", 500);
-            }
-        }
-    }
-
-    // ----------- Utilities -----------
+    // ---------------- Utilities ----------------
     private static String readRequestBody(HttpExchange exchange) throws IOException {
         InputStream is = exchange.getRequestBody();
         BufferedReader reader = new BufferedReader(new InputStreamReader(is));
@@ -145,19 +148,6 @@ public class CanteenAPIService {
         String line;
         while ((line = reader.readLine()) != null) body.append(line);
         return body.toString();
-    }
-
-    private static Map<String, String> parseJson(String json) {
-        Map<String, String> result = new HashMap<>();
-        json = json.replaceAll("[{}\"]", "");
-        String[] pairs = json.split(",");
-        for (String pair : pairs) {
-            String[] keyValue = pair.split(":");
-            if (keyValue.length == 2) {
-                result.put(keyValue[0].trim(), keyValue[1].trim());
-            }
-        }
-        return result;
     }
 
     private static void sendResponse(HttpExchange exchange, String response, int statusCode) throws IOException {
@@ -171,5 +161,11 @@ public class CanteenAPIService {
         os.close();
     }
 
+    private static String hashPassword(String password) throws Exception {
+        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        byte[] hash = md.digest(password.getBytes("UTF-8"));
+        StringBuilder sb = new StringBuilder();
+        for (byte b : hash) sb.append(String.format("%02x", b));
+        return sb.toString();
+    }
 }
-
